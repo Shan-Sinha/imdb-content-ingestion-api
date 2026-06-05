@@ -50,13 +50,8 @@ def upload_csv():
         file.save(filepath)
         logger.info("File saved to %s", filepath)
 
-        # --- Process and insert (OOP) ---
-        from app.services.csv_service import CSVService
-        collection = current_app.db["movies"]
-        chunk_size = current_app.config.get("CSV_CHUNK_SIZE", 5000)
-        
-        csv_service = CSVService(collection, chunk_size)
-        total = csv_service.process(filepath)
+        # --- Process and insert (SOLID DI) ---
+        total = current_app.csv_service.process(filepath)
 
         return success_response(
             data={"records_inserted": total},

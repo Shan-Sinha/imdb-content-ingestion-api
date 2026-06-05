@@ -4,34 +4,23 @@ import math
 import re
 
 from app.models.movie import Movie
+from app.services.interfaces import IMovieService
+from app.repositories.movie_repository import IMovieRepository
 
 
-class MovieService:
-    """Service to query and search the movie catalog in MongoDB."""
+class MovieService(IMovieService):
+    """Service to query and search the movie catalog using repository abstraction."""
 
-    def __init__(self, collection):
-        """Initialize the Movie service with MongoDB collection reference."""
-        self.collection = collection
+    def __init__(self, movie_repository: IMovieRepository):
+        """Initialize MovieService with movie repository."""
+        self.movie_repository = movie_repository
 
     def get_movies(self, page: int, per_page: int,
                    sort_field: str, sort_direction: int,
                    year: int | None = None,
                    language: str | None = None,
                    original_title: str | None = None) -> dict:
-        """Query movies with filtering, sorting, and pagination.
-
-        Args:
-            page: 1-based page number.
-            per_page: Items per page.
-            sort_field: MongoDB field name to sort on.
-            sort_direction: 1 (ascending) or -1 (descending).
-            year: Optional year filter.
-            language: Optional language filter (case-insensitive substring).
-            original_title: Optional original title filter (case-insensitive substring).
-
-        Returns:
-            Dict with 'movies' list and 'pagination' metadata.
-        """
+        """Query movies with filtering, sorting, and pagination using MovieRepository."""
         # Build filter query
         query = {}
         if year is not None:
@@ -43,21 +32,21 @@ class MovieService:
             # Case-insensitive substring match
             query["original_title"] = {"$regex": re.escape(original_title), "$options": "i"}
 
-        # Count total matching documents (before pagination)
-        total_records = self.collection.count_documents(query)
+        # Count total matching documents (via repository)
+        total_records = self.movie_repository.count(query)
         total_pages = math.ceil(total_records / per_page) if total_records > 0 else 0
 
-        # Fetch the page
+        # Fetch the page (via repository)
         skip = (page - 1) * per_page
-        cursor = (
-            self.collection
-            .find(query)
-            .sort(sort_field, sort_direction)
-            .skip(skip)
-            .limit(per_page)
+        docs = self.movie_repository.get_movies_paginated(
+            query=query,
+            sort_field=sort_field,
+            sort_direction=sort_direction,
+            skip=skip,
+            limit=per_page
         )
 
-        movies = [Movie.from_mongo(doc).to_dict() for doc in cursor]
+        movies = [Movie.from_mongo(doc).to_dict() for doc in docs]
 
         return {
             "movies": movies,

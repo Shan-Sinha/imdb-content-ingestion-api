@@ -54,12 +54,9 @@ def list_movies():
         except (ValueError, TypeError):
             return error_response("'year' must be a valid integer.", 400)
 
-    # --- Query (OOP) ---
+    # --- Query (SOLID DI) ---
     try:
-        from app.services.movie_service import MovieService
-        collection = current_app.db["movies"]
-        movie_service = MovieService(collection)
-        result = movie_service.get_movies(
+        result = current_app.movie_service.get_movies(
             page=page,
             per_page=per_page,
             sort_field=sort_field,

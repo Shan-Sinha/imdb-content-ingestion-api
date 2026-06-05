@@ -5,11 +5,14 @@ import logging
 from datetime import datetime, timezone
 import pandas as pd
 
+from app.services.interfaces import ICSVService
+from app.repositories.movie_repository import IMovieRepository
+
 logger = logging.getLogger(__name__)
 
 
-class CSVService:
-    """Service to handle CSV files schema validation and bulk database loading."""
+class CSVService(ICSVService):
+    """Service to handle CSV files schema validation and bulk repository loading."""
 
     REQUIRED_COLUMNS = [
         "budget", "homepage", "original_language", "original_title", "overview",
@@ -17,9 +20,9 @@ class CSVService:
         "vote_average", "vote_count", "production_company_id", "genre_id", "languages"
     ]
 
-    def __init__(self, collection, chunk_size: int = 5000):
-        """Initialize the CSV service with MongoDB collection and chunk size."""
-        self.collection = collection
+    def __init__(self, movie_repository: IMovieRepository, chunk_size: int = 5000):
+        """Initialize the CSV service with movie repository and chunk size."""
+        self.movie_repository = movie_repository
         self.chunk_size = chunk_size
 
     def validate_headers(self, filepath: str) -> None:
@@ -35,7 +38,7 @@ class CSVService:
             raise ValueError(f"CSV format is incorrect. Missing columns: {', '.join(sorted(missing_cols))}")
 
     def process(self, filepath: str) -> int:
-        """Read a CSV file in chunks, validate, and bulk-insert into MongoDB."""
+        """Read a CSV file in chunks, validate, and bulk-insert into repository."""
         self.validate_headers(filepath)
 
         total_inserted = 0
@@ -51,11 +54,11 @@ class CSVService:
         for chunk_number, chunk_df in enumerate(reader, start=1):
             documents = self._transform_chunk(chunk_df)
             if documents:
-                self.collection.insert_many(documents, ordered=False)
-                total_inserted += len(documents)
+                inserted_count = self.movie_repository.insert_many(documents)
+                total_inserted += inserted_count
                 logger.info(
                     "Chunk %d: inserted %d records (total so far: %d)",
-                    chunk_number, len(documents), total_inserted,
+                    chunk_number, inserted_count, total_inserted,
                 )
 
         return total_inserted

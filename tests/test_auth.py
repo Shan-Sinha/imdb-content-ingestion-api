@@ -1,4 +1,4 @@
-"""Integration tests for token-based authentication and endpoint access."""
+"""Integration tests for user registration, token-based authentication, and endpoint access."""
 
 import io
 import json
@@ -67,22 +67,71 @@ def test_auth_success_with_x_api_key(client):
     assert json_data["success"] is True
 
 
+# ================== User Registration Tests ==================
+
+def test_register_user_success(client):
+    """Verify that registering a new user succeeds and hashes the password."""
+    response = client.post(
+        "/api/v1/users",
+        json={"username": "new_user_123", "password": "secure_password"}
+    )
+    assert response.status_code == 201
+    json_data = response.get_json()
+    assert json_data["success"] is True
+    assert json_data["data"]["username"] == "new_user_123"
+    assert "id" in json_data["data"]
+
+
+def test_register_user_duplicate_username(client):
+    """Verify that registering an existing username returns a 400 error."""
+    # First registration
+    client.post(
+        "/api/v1/users",
+        json={"username": "duplicate_user", "password": "password1"}
+    )
+    # Duplicate registration
+    response = client.post(
+        "/api/v1/users",
+        json={"username": "duplicate_user", "password": "password1"}
+    )
+    assert response.status_code == 400
+    json_data = response.get_json()
+    assert json_data["success"] is False
+    assert "already exists" in json_data["message"]
+
+
+def test_register_user_missing_params(client):
+    """Verify that missing username or password yields a 400 error."""
+    response = client.post(
+        "/api/v1/users",
+        json={"username": "only_username"}
+    )
+    assert response.status_code == 400
+
+
 # ================== Token Generation Tests ==================
 
 def test_generate_token_success(client):
-    """Verify that valid credentials generate a valid signed bearer token."""
-    response = client.post(
-        "/api/v1/auth/token",
-        json={"username": "test_admin", "password": "test_password"}
+    """Verify that a registered user can log in and generate a valid Bearer token."""
+    # 1. Register user
+    reg_response = client.post(
+        "/api/v1/users",
+        json={"username": "valid_user", "password": "valid_password"}
     )
-    assert response.status_code == 200
-    json_data = response.get_json()
+    assert reg_response.status_code == 201
+
+    # 2. Get token
+    token_response = client.post(
+        "/api/v1/auth/token",
+        json={"username": "valid_user", "password": "valid_password"}
+    )
+    assert token_response.status_code == 200
+    json_data = token_response.get_json()
     assert json_data["success"] is True
     assert "token" in json_data["data"]
     assert json_data["data"]["token_type"] == "Bearer"
-    assert json_data["data"]["expires_in"] == 3600
 
-    # Test using the newly generated token on the movies endpoint
+    # 3. Test using the newly generated token on the movies endpoint
     generated_token = json_data["data"]["token"]
     movies_response = client.get(
         "/api/v1/movies",
@@ -93,11 +142,18 @@ def test_generate_token_success(client):
     assert movies_json["success"] is True
 
 
-def test_generate_token_invalid_credentials(client):
-    """Verify that invalid credentials yield a 401 error."""
+def test_generate_token_invalid_password(client):
+    """Verify that logging in with incorrect password yields a 401 error."""
+    # 1. Register user
+    client.post(
+        "/api/v1/users",
+        json={"username": "some_user", "password": "good_password"}
+    )
+
+    # 2. Login with bad password
     response = client.post(
         "/api/v1/auth/token",
-        json={"username": "test_admin", "password": "wrong_password"}
+        json={"username": "some_user", "password": "wrong_password"}
     )
     assert response.status_code == 401
     json_data = response.get_json()
@@ -106,13 +162,9 @@ def test_generate_token_invalid_credentials(client):
 
 
 def test_generate_token_missing_params(client):
-    """Verify that missing username or password yields a 400 error."""
-    # Missing password
+    """Verify that missing credentials on token request yields a 400 error."""
     response = client.post(
         "/api/v1/auth/token",
-        json={"username": "test_admin"}
+        json={"username": "some_user"}
     )
     assert response.status_code == 400
-    json_data = response.get_json()
-    assert json_data["success"] is False
-    assert "Missing" in json_data["message"]

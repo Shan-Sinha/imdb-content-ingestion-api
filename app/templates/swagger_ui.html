@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>IMDb Content System API Documentation</title>
+    <!-- Load official Swagger UI styles -->
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+    <!-- Load custom IMDb dark theme styles from static folder -->
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/swagger_ui.css') }}" />
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <!-- Load official Swagger UI bundle and presets -->
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" charset="UTF-8"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+    <script>
+    window.onload = function() {
+      const ui = SwaggerUIBundle({
+        url: "/api/v1/swagger.json",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "BaseLayout",
+        defaultModelsExpandDepth: 1,
+        defaultModelExpandDepth: 1
+      });
+      window.ui = ui;
+    };
+    </script>
+</body>
+</html>

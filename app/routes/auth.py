@@ -22,18 +22,15 @@ def generate_token():
     if not username or not password:
         return error_response("Missing 'username' or 'password' in request body.", 400)
 
-    # 2. Get configured credentials
-    expected_username = current_app.config.get("AUTH_USERNAME", "admin")
-    expected_password = current_app.config.get("AUTH_PASSWORD", "password123")
-
-    # 3. Verify credentials
-    if username != expected_username or password != expected_password:
+    # 2. Verify credentials using dynamic auth service (database backed)
+    authenticated_user = current_app.auth_service.authenticate_user(username, password)
+    if not authenticated_user:
         return error_response("Unauthorized: Invalid username or password.", 401)
 
-    # 4. Generate signed token (OOP dependency injection)
-    token = current_app.authenticator.generate_token(username)
+    # 3. Generate signed token (SOLID DI)
+    token = current_app.auth_service.generate_token(authenticated_user)
 
-    logger.info("Token generated successfully for user: %s", username)
+    logger.info("Token generated successfully for user: %s", authenticated_user)
 
     return success_response(
         data={

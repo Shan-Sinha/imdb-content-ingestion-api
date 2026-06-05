@@ -43,9 +43,29 @@ def create_app(config_class=Config):
         static_key=app.config.get("API_KEY", "default_secret_key_123")
     )
 
+    # ---- Repository Setup (SOLID DIP) ----
+    from app.repositories.movie_repository import MongoMovieRepository
+    from app.repositories.user_repository import MongoUserRepository
+    
+    movie_repository = MongoMovieRepository(db)
+    user_repository = MongoUserRepository(db)
+    
+    app.movie_repository = movie_repository
+    app.user_repository = user_repository
+
+    # ---- Service Setup (SOLID DIP) ----
+    from app.services.movie_service import MovieService
+    from app.services.csv_service import CSVService
+    from app.services.auth_service import AuthService
+    
+    app.movie_service = MovieService(movie_repository)
+    app.csv_service = CSVService(movie_repository, chunk_size=app.config.get("CSV_CHUNK_SIZE", 5000))
+    app.auth_service = AuthService(user_repository, app.authenticator)
+
     # ---- Create indexes (idempotent, best-effort on startup) ----
     try:
         _ensure_indexes(db)
+        user_repository.ensure_indexes()
     except Exception as exc:
         logger.warning(
             "Could not create indexes on startup (MongoDB may not be available): %s",
@@ -57,10 +77,12 @@ def create_app(config_class=Config):
     from app.routes.movies import movies_bp
     from app.routes.docs import docs_bp
     from app.routes.auth import auth_bp
+    from app.routes.users import users_bp
 
     app.register_blueprint(upload_bp, url_prefix="/api/v1")
     app.register_blueprint(movies_bp, url_prefix="/api/v1")
     app.register_blueprint(auth_bp, url_prefix="/api/v1")
+    app.register_blueprint(users_bp, url_prefix="/api/v1")
     app.register_blueprint(docs_bp)
 
     return app

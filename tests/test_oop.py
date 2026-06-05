@@ -54,14 +54,19 @@ def test_token_authenticator_lifecycle():
 
 
 def test_movie_service_querying(db, client, sample_csv):
-    """Verify that MovieService queries correctly."""
-    # Seed the DB
+    """Verify that MovieService queries correctly using repositories."""
+    from app.repositories.movie_repository import MongoMovieRepository
     from app.services.csv_service import CSVService
-    csv_service = CSVService(db["movies"])
+
+    # 1. Instantiate concrete repository
+    movie_repo = MongoMovieRepository(db)
+
+    # 2. Seed the DB using CSVService with repository injection
+    csv_service = CSVService(movie_repo)
     csv_service.process(sample_csv)
     
-    # Query via MovieService
-    service = MovieService(db["movies"])
+    # 3. Query via MovieService with repository injection
+    service = MovieService(movie_repo)
     result = service.get_movies(
         page=1,
         per_page=2,

@@ -20,6 +20,66 @@
     }
   ],
   "paths": {
+    "/api/v1/users": {
+      "post": {
+        "tags": ["User Management"],
+        "summary": "Register a new user",
+        "description": "Create a new user with a username and password. Password will be securely hashed.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "example": "john_doe" },
+                  "password": { "type": "string", "example": "secret_pass_123" }
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string", "example": "User registered successfully." },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "example": "65bfa78a2e1d7a8d54231b23" },
+                        "username": { "type": "string", "example": "john_doe" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid credentials or username already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "User with username 'john_doe' already exists." }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/token": {
       "post": {
         "tags": ["Authentication"],
