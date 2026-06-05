@@ -1,0 +1,384 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "IMDb Content System API",
+    "description": "API documentation for the IMDb Content Upload and Review system. Access interactive tools to upload data and browse movies.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Local server"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    },
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/token": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Generate a timed Bearer token",
+        "description": "Accepts JSON credentials (username/password) and returns a timed signed Bearer token valid for 1 hour.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "example": "admin" },
+                  "password": { "type": "string", "example": "password123" }
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string", "example": "Token generated successfully." },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": { "type": "string", "example": "eyJh..." },
+                        "expires_in": { "type": "integer", "example": 3600 },
+                        "token_type": { "type": "string", "example": "Bearer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Missing 'username' or 'password' in request body." }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Unauthorized: Invalid username or password." }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/upload": {
+      "post": {
+        "tags": ["Content Upload"],
+        "summary": "Upload a movie data CSV file",
+        "description": "Accepts a multipart CSV file containing movie data. The file is processed in chunks (default 5,000 rows) and bulk-inserted into the database.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The CSV file to upload."
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CSV processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string", "example": "CSV uploaded and processed successfully." },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "records_inserted": { "type": "integer", "example": 45428 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (e.g. missing file, wrong extension, or invalid headers)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "CSV format is incorrect. Missing columns: title, release_date" },
+                    "data": { "type": "object", "nullable": true, "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized request (e.g. invalid or missing API key)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Unauthorized: Invalid or missing API key." },
+                    "data": { "type": "object", "nullable": true, "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Failed to process CSV: Connection refused" },
+                    "data": { "type": "object", "nullable": true, "example": null }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/movies": {
+      "get": {
+        "tags": ["Movies Database"],
+        "summary": "List all movies in a paginated, filterable, and sortable manner",
+        "description": "Returns a list of movies from the database. Supports page pagination, year and language filtering, original title searching, and sorting by release date or rating.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "The page number to retrieve.",
+            "required": false,
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Number of items per page (maximum 100).",
+            "required": false,
+            "schema": { "type": "integer", "default": 10 }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Filter movies by release year.",
+            "required": false,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "description": "Filter movies by spoken language (e.g., 'English', 'Français'). Case-insensitive.",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "original_title",
+            "in": "query",
+            "description": "Filter movies by original title (case-insensitive substring match).",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Field to sort the results by.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["release_date", "vote_average"],
+              "default": "release_date"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Sort order direction.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response containing movie records and pagination info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string", "example": "Movies fetched successfully." },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "movies": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Movie"
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "current_page": { "type": "integer", "example": 1 },
+                            "per_page": { "type": "integer", "example": 10 },
+                            "total_records": { "type": "integer", "example": 45428 },
+                            "total_pages": { "type": "integer", "example": 4543 },
+                            "has_next": { "type": "boolean", "example": true },
+                            "has_prev": { "type": "boolean", "example": false }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters (e.g., non-integer pagination, invalid sort options)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "'page' must be a positive integer." },
+                    "data": { "type": "object", "nullable": true, "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized request (e.g. invalid or missing API key)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Unauthorized: Invalid or missing API key." },
+                    "data": { "type": "object", "nullable": true, "example": null }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": false },
+                    "message": { "type": "string", "example": "Internal server error" },
+                    "data": { "type": "object", "nullable": true, "example": null }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "X-API-Key Header authentication"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token header (Authorization: Bearer <key>)"
+      }
+    },
+    "schemas": {
+      "Movie": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string", "example": "65bfa78a2e1d7a8d54231b23" },
+          "title": { "type": "string", "example": "Toy Story" },
+          "original_title": { "type": "string", "example": "Toy Story" },
+          "original_language": { "type": "string", "example": "en" },
+          "overview": { "type": "string", "example": "Led by Woody, Andy's toys live happily..." },
+          "status": { "type": "string", "example": "Released" },
+          "homepage": { "type": "string", "nullable": true, "example": "http://toystory.disney.com/toy-story" },
+          "release_date": { "type": "string", "format": "date", "example": "1995-10-30T00:00:00Z" },
+          "year": { "type": "integer", "example": 1995 },
+          "budget": { "type": "number", "example": 30000000 },
+          "revenue": { "type": "number", "example": 373554033 },
+          "runtime": { "type": "integer", "example": 81 },
+          "vote_average": { "type": "number", "example": 7.7 },
+          "vote_count": { "type": "integer", "example": 5415 },
+          "production_company_id": { "type": "integer", "example": 3 },
+          "genre_id": { "type": "integer", "example": 16 },
+          "languages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["English"]
+          },
+          "created_at": { "type": "string", "format": "date-time", "example": "2026-06-05T10:40:21Z" }
+        }
+      }
+    }
+  }
+}

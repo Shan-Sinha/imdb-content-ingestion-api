@@ -1,0 +1,253 @@
+import json
+import os
+from flask import Blueprint, Response, redirect, render_template_string
+
+docs_bp = Blueprint("docs", __name__)
+
+
+@docs_bp.route("/")
+def index():
+    """Redirect root to /docs."""
+    return redirect("/docs")
+
+
+@docs_bp.route("/docs")
+def swagger_ui():
+    """Serve the Swagger UI documentation page with custom IMDb styling."""
+    html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>IMDb Content System API Documentation</title>
+    <!-- Load official Swagger UI styles -->
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+    <style>
+        html { box-sizing: border-box; }
+        *, *:before, *:after { box-sizing: inherit; }
+        
+        /* IMDb Dark Mode Styling Overrides */
+        body {
+            margin: 0;
+            background: #121212 !important;
+            color: #f5f5f5 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        
+        .swagger-ui {
+            background-color: #121212;
+            color: #f5f5f5;
+        }
+        
+        /* Info Area */
+        .swagger-ui .info {
+            margin: 30px 0;
+        }
+        .swagger-ui .info .title {
+            color: #f5c518 !important; /* IMDb Yellow */
+            font-weight: 800;
+        }
+        .swagger-ui .info p, .swagger-ui .info li, .swagger-ui .info td {
+            color: #cccccc !important;
+        }
+        .swagger-ui .info a {
+            color: #f5c518 !important;
+        }
+        
+        /* Topbar / Scheme Bar */
+        .swagger-ui .scheme-container {
+            background-color: #1a1a1a !important;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+            border-bottom: 2px solid #2d2d2d;
+            padding: 15px 0;
+        }
+        .swagger-ui .schemes-title {
+            color: #f5f5f5 !important;
+        }
+        .swagger-ui select {
+            background-color: #2d2d2d !important;
+            color: #f5f5f5 !important;
+            border: 1px solid #444 !important;
+        }
+        
+        /* Buttons */
+        .swagger-ui .btn {
+            background-color: #2d2d2d !important;
+            color: #f5f5f5 !important;
+            border: 1px solid #444 !important;
+            transition: all 0.2s ease;
+        }
+        .swagger-ui .btn:hover {
+            background-color: #f5c518 !important;
+            color: #121212 !important;
+            border-color: #f5c518 !important;
+        }
+        .swagger-ui .btn.execute {
+            background-color: #f5c518 !important;
+            color: #121212 !important;
+            border-color: #f5c518 !important;
+            font-weight: bold;
+        }
+        .swagger-ui .btn.execute:hover {
+            background-color: #d4a713 !important;
+        }
+        
+        /* Endpoints & Operations */
+        .swagger-ui .opblock {
+            background-color: #1a1a1a !important;
+            border-radius: 8px !important;
+            border: 1px solid #2d2d2d !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+        }
+        .swagger-ui .opblock.opblock-post {
+            border-color: #49cc90 !important;
+        }
+        .swagger-ui .opblock.opblock-get {
+            border-color: #61afff !important;
+        }
+        .swagger-ui .opblock .opblock-summary {
+            border-bottom: 1px solid #2d2d2d !important;
+        }
+        .swagger-ui .opblock-summary-path,
+        .swagger-ui .opblock-summary-path__deprecated,
+        .swagger-ui .opblock-summary-description {
+            color: #ffffff !important;
+            font-weight: 500;
+        }
+        
+        /* Parameters & Table */
+        .swagger-ui table thead tr td,
+        .swagger-ui table thead tr th {
+            color: #f5c518 !important;
+            border-bottom: 1px solid #2d2d2d !important;
+        }
+        .swagger-ui .parameter__name {
+            color: #ffffff !important;
+            font-weight: bold;
+        }
+        .swagger-ui .parameter__type {
+            color: #888888 !important;
+        }
+        .swagger-ui .parameter__in {
+            color: #aaa !important;
+            font-style: italic;
+        }
+        .swagger-ui .parameter__extension,
+        .swagger-ui .parameter__is-deprecated {
+            color: #ff6060 !important;
+        }
+        
+        /* Responses & Headers */
+        .swagger-ui .response-col_status {
+            color: #ffffff !important;
+            font-weight: bold;
+        }
+        .swagger-ui .response-col_links {
+            color: #cccccc !important;
+        }
+        
+        /* Code Blocks & JSON */
+        .swagger-ui .microlight {
+            background-color: #2d2d2d !important;
+            color: #a9ffcb !important;
+            border-radius: 4px;
+        }
+        .swagger-ui .highlight-code {
+            position: relative;
+        }
+        .swagger-ui pre {
+            background: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+        .swagger-ui code {
+            color: #a9ffcb !important;
+        }
+        
+        /* Inputs & Textareas */
+        .swagger-ui input[type=text],
+        .swagger-ui textarea {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+            border: 1px solid #444 !important;
+            border-radius: 4px;
+            padding: 8px;
+        }
+        .swagger-ui input[type=text]:focus,
+        .swagger-ui textarea:focus {
+            outline: none;
+            border-color: #f5c518 !important;
+        }
+        
+        /* Server & Model Block */
+        .swagger-ui .servers-title {
+            color: #f5f5f5 !important;
+        }
+        .swagger-ui .models {
+            background-color: #1a1a1a !important;
+            border: 1px solid #2d2d2d !important;
+        }
+        .swagger-ui .models h4 {
+            color: #f5c518 !important;
+            border-bottom: 1px solid #2d2d2d !important;
+        }
+        .swagger-ui .model-box {
+            background-color: #252525 !important;
+        }
+        .swagger-ui .model {
+            color: #cccccc !important;
+        }
+        .swagger-ui .model-title {
+            color: #ffffff !important;
+        }
+        
+        /* Headers & Footers */
+        .swagger-ui .topbar {
+            background-color: #121212 !important;
+            border-bottom: 2px solid #f5c518 !important;
+            display: none; /* Hide default top bar as we don't need it */
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <!-- Load official Swagger UI bundle and presets -->
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" charset="UTF-8"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+    <script>
+    window.onload = function() {
+      const ui = SwaggerUIBundle({
+        url: "/api/v1/swagger.json",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "BaseLayout",
+        defaultModelsExpandDepth: 1,
+        defaultModelExpandDepth: 1
+      });
+      window.ui = ui;
+    };
+    </script>
+</body>
+</html>"""
+    return render_template_string(html_content)
+
+
+@docs_bp.route("/api/v1/swagger.json")
+def get_swagger_json():
+    """Serve the OpenAPI specification."""
+    spec_path = os.path.join(os.path.dirname(__file__), "swagger.json")
+    try:
+        with open(spec_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return Response(json.dumps(data), mimetype="application/json")
+    except Exception as exc:
+        return Response(
+            json.dumps({"error": f"Failed to load spec: {str(exc)}"}),
+            status=500,
+            mimetype="application/json",
+        )
